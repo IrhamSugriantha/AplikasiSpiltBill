@@ -6,7 +6,8 @@ import '../utils/app_theme.dart';
 import 'input_pesanan_screen.dart';
 
 class InputSesiScreen extends StatefulWidget {
-  const InputSesiScreen({super.key});
+  final SessionModel? editSession;
+  const InputSesiScreen({super.key, this.editSession});
 
   @override
   State<InputSesiScreen> createState() => _InputSesiScreenState();
@@ -18,12 +19,29 @@ class _InputSesiScreenState extends State<InputSesiScreen> {
   String _selectedDate = '';
   final List<String> _members = [];
 
+  bool _initialized = false;
+
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _selectedDate =
-        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+    if (widget.editSession == null) {
+      final now = DateTime.now();
+      _selectedDate =
+          '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized && widget.editSession != null) {
+      _initialized = true;
+      final s = widget.editSession!;
+      _namaCtrl.text = s.sessionName;
+      _selectedDate = s.date;
+      final ctrl = context.read<AppController>();
+      _members.addAll(s.members.where((m) => m != ctrl.hostName));
+    }
   }
 
   @override
@@ -36,9 +54,18 @@ class _InputSesiScreenState extends State<InputSesiScreen> {
   void _addMember() {
     final name = _temanCtrl.text.trim();
     if (name.isEmpty) return;
-    if (_members.contains(name)) {
+
+    final ctrl = context.read<AppController>();
+    if (name.toLowerCase() == ctrl.currentUser?.name.toLowerCase()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama sudah ditambahkan')),
+        const SnackBar(content: Text('Anda otomatis masuk ke sesi (tidak perlu menambahkan nama sendiri)')),
+      );
+      return;
+    }
+
+    if (_members.any((m) => m.toLowerCase() == name.toLowerCase())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nama teman sudah ditambahkan')),
       );
       return;
     }
@@ -49,6 +76,40 @@ class _InputSesiScreenState extends State<InputSesiScreen> {
   }
 
   void _removeMember(String name) {
+    if (widget.editSession != null) {
+      final hasItems = widget.editSession!.items.any((i) => i.assignedTo == name);
+      if (hasItems) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            title: const Text('Hapus Teman',
+                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+            content: Text('Apakah Anda yakin ingin menghapus $name? Item pesanan miliknya juga akan ikut terhapus.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Batal',
+                    style: TextStyle(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  setState(() => _members.remove(name));
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.belumLunas,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Hapus',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
     setState(() => _members.remove(name));
   }
 
@@ -89,19 +150,30 @@ class _InputSesiScreenState extends State<InputSesiScreen> {
     }
 
     final ctrl = context.read<AppController>();
-    // Add host to members if not already
     final allMembers = [ctrl.hostName, ..._members.where((m) => m != ctrl.hostName)];
 
-    final session = ctrl.createSession(
-      name: _namaCtrl.text.trim(),
-      date: _selectedDate,
-      members: allMembers,
-    );
+    SessionModel session;
+    if (widget.editSession != null) {
+      session = widget.editSession!;
+      session.sessionName = _namaCtrl.text.trim();
+      session.date = _selectedDate;
+      session.members = allMembers;
+      // Hapus item pesanan dari anggota yang dihapus
+      session.items.removeWhere((i) => !allMembers.contains(i.assignedTo));
+      // Hapus status lunas dari anggota yang dihapus
+      session.paidMembers.removeWhere((m) => !allMembers.contains(m));
+    } else {
+      session = ctrl.createSession(
+        name: _namaCtrl.text.trim(),
+        date: _selectedDate,
+        members: allMembers,
+      );
+    }
 
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => InputPesananScreen(session: session),
+        builder: (_) => InputPesananScreen(session: session, isEdit: widget.editSession != null),
       ),
     );
   }

@@ -136,6 +136,45 @@ class HomeScreen extends StatelessWidget {
                         builder: (_) => RingkasanTagihanScreen(session: s),
                       ),
                     ),
+                    onEdit: () {
+                      // Navigate to InputSesiScreen with pre-filled data
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => InputSesiScreen(editSession: s),
+                        ),
+                      );
+                    },
+                    onDelete: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          title: const Text('Hapus Sesi',
+                              style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+                          content: const Text('Apakah Anda yakin ingin menghapus sesi ini secara permanen?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Batal',
+                                  style: TextStyle(color: AppColors.textSecondary)),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                context.read<AppController>().deleteSession(s.id);
+                                Navigator.pop(ctx);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.belumLunas,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: const Text('Hapus',
+                                  style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),

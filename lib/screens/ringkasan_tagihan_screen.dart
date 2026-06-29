@@ -13,40 +13,16 @@ class RingkasanTagihanScreen extends StatefulWidget {
 }
 
 class _RingkasanTagihanScreenState extends State<RingkasanTagihanScreen> {
-  late List<MemberBill> _memberBills;
-  // Track paid state locally (Set of member names that are paid)
-  late Set<String> _paidMembers;
-
-  @override
-  void initState() {
-    super.initState();
-    final ctrl = context.read<AppController>();
-    _memberBills = widget.session.buildMemberBills(ctrl.hostName);
-    // Host is always paid
-    _paidMembers = {ctrl.hostName};
-  }
-
   void _togglePaid(String memberName) {
     final ctrl = context.read<AppController>();
     if (memberName == ctrl.hostName) return; // Host can't be toggled
-    setState(() {
-      if (_paidMembers.contains(memberName)) {
-        _paidMembers.remove(memberName);
-      } else {
-        _paidMembers.add(memberName);
-      }
-    });
-    // Check if all paid → mark session as completed
-    final allPaid = widget.session.members.every((m) => _paidMembers.contains(m));
-    if (allPaid != widget.session.isCompleted) {
-      widget.session.isCompleted = allPaid;
-      ctrl.finalizeSession(widget.session);
-    }
+    
+    ctrl.toggleMemberPaid(widget.session.id, memberName);
   }
 
-  double _getMemberAmount(MemberBill mb) {
-    if (widget.session.mode == BillMode.bagiRata) {
-      return widget.session.perPersonAmount;
+  double _getMemberAmount(SessionModel session, MemberBill mb) {
+    if (session.mode == BillMode.bagiRata) {
+      return session.perPersonAmount;
     } else {
       return mb.total;
     }
@@ -54,20 +30,33 @@ class _RingkasanTagihanScreenState extends State<RingkasanTagihanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = context.read<AppController>();
+    final ctrl = context.watch<AppController>();
     final hostInitial = (ctrl.currentUser?.name ?? 'U')[0].toUpperCase();
-    final session = widget.session;
+    
+    final session = ctrl.sessions.firstWhere(
+      (s) => s.id == widget.session.id,
+      orElse: () => widget.session,
+    );
+    
+    final memberBills = session.buildMemberBills(ctrl.hostName);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Ringkasan Tagihan'),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      },
+      child: Scaffold(
         backgroundColor: AppColors.background,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
-        ),
+        appBar: AppBar(
+          title: const Text('Ringkasan Tagihan'),
+          backgroundColor: AppColors.background,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+          ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -151,10 +140,10 @@ class _RingkasanTagihanScreenState extends State<RingkasanTagihanScreen> {
           const SizedBox(height: 12),
 
           // Member cards
-          ..._memberBills.map((mb) {
-            final isHost = mb.name == ctrl.hostName;
-            final isPaid = _paidMembers.contains(mb.name);
-            final amount = _getMemberAmount(mb);
+          ...memberBills.map((mb) {
+            final isHost = mb.isHost;
+            final isPaid = mb.isPaid;
+            final amount = _getMemberAmount(session, mb);
             final initial = mb.name[0].toUpperCase();
 
             // Generate avatar color based on name
@@ -173,7 +162,7 @@ class _RingkasanTagihanScreenState extends State<RingkasanTagihanScreen> {
           }),
         ],
       ),
-    );
+    ));
   }
 
   Color _avatarColor(String name) {
@@ -222,15 +211,10 @@ class _MemberCardState extends State<_MemberCard> {
   Widget build(BuildContext context) {
     final mb = widget.memberBill;
     final hasItems = mb.items.isNotEmpty;
-    final showExpand = widget.mode == BillMode.detailPesanan && hasItems && !widget.isHost;
+    final showExpand = widget.mode == BillMode.detailPesanan && hasItems;
 
-    // Order description
     String orderDesc;
-    if (widget.isHost) {
-      orderDesc = mb.items.isNotEmpty
-          ? mb.items.map((i) => i.name).join('\n')
-          : 'Menalangi semua';
-    } else if (widget.mode == BillMode.bagiRata) {
+    if (widget.mode == BillMode.bagiRata) {
       orderDesc = 'Bagian rata';
     } else {
       orderDesc = '${mb.items.length} Item';
@@ -274,12 +258,14 @@ class _MemberCardState extends State<_MemberCard> {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            mb.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+                          Flexible(
+                            child: Text(
+                              mb.name,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
                           ),
                           if (showExpand) ...[
@@ -299,11 +285,9 @@ class _MemberCardState extends State<_MemberCard> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        widget.isHost && mb.items.isNotEmpty
-                            ? 'Pesanan: ${mb.items.map((i) => i.name).join(', ')}'
-                            : widget.mode == BillMode.detailPesanan
+                        widget.mode == BillMode.detailPesanan
                                 ? 'Pesanan: $orderDesc'
-                                : 'Pesanan: Bagian rata',
+                                : 'Pesanan: Bagi rata',
                         style: const TextStyle(
                             fontSize: 12, color: AppColors.textSecondary),
                         maxLines: 2,
@@ -336,6 +320,24 @@ class _MemberCardState extends State<_MemberCard> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: AppColors.accent,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      )
+                    else if (widget.mode == BillMode.detailPesanan && !hasItems)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'Tidak Ada\nTagihan',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
@@ -422,10 +424,13 @@ class _MemberCardState extends State<_MemberCard> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(item.name,
-                              style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textSecondary)),
+                          Flexible(
+                            child: Text(item.name,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.textSecondary)),
+                          ),
+                          const SizedBox(width: 8),
                           Text(
                             formatRupiah(item.price),
                             style: const TextStyle(

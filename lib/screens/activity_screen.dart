@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../controllers/app_controller.dart';
 import '../models/session_model.dart';
 import '../utils/app_theme.dart';
+import 'input_sesi_screen.dart';
 import 'ringkasan_tagihan_screen.dart';
 
 class ActivityScreen extends StatefulWidget {
@@ -89,6 +90,44 @@ class _ActivityScreenState extends State<ActivityScreen> {
                                 RingkasanTagihanScreen(session: s),
                           ),
                         ),
+                        onEdit: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => InputSesiScreen(editSession: s),
+                            ),
+                          );
+                        },
+                        onDelete: () {
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              title: const Text('Hapus Sesi',
+                                  style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+                              content: const Text('Apakah Anda yakin ingin menghapus sesi ini secara permanen?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx),
+                                  child: const Text('Batal',
+                                      style: TextStyle(color: AppColors.textSecondary)),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    context.read<AppController>().deleteSession(s.id);
+                                    Navigator.pop(ctx);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.belumLunas,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  child: const Text('Hapus',
+                                      style: TextStyle(color: Colors.white)),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -162,8 +201,15 @@ class _FilterChip extends StatelessWidget {
 class _ActivityCard extends StatelessWidget {
   final SessionModel session;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
-  const _ActivityCard({required this.session, required this.onTap});
+  const _ActivityCard({
+    required this.session,
+    required this.onTap,
+    this.onEdit,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -182,13 +228,43 @@ class _ActivityCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Session name and member count
-            Text(
-              session.sessionName,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    session.sessionName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: PopupMenuButton<String>(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.more_vert, size: 20, color: AppColors.textSecondary),
+                    onSelected: (value) {
+                      if (value == 'edit' && onEdit != null) onEdit!();
+                      if (value == 'delete' && onDelete != null) onDelete!();
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Edit Sesi', style: TextStyle(fontSize: 13)),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Hapus Sesi', style: TextStyle(fontSize: 13, color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 2),
             Text(

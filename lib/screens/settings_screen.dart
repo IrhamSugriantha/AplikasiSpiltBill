@@ -147,9 +147,9 @@ class SettingsScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: const Text('Konfirmasi Keluar',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+            style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
         content: const Text('Apakah Anda yakin ingin keluar dari akun?'),
         actions: [
           TextButton(
@@ -158,15 +158,18 @@ class SettingsScreen extends StatelessWidget {
                 style: TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
-            onPressed: () {
-              ctrl.logout();
+            onPressed: () async {
+              await ctrl.logout();
+              if (!context.mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
               );
             },
             style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFB91C1C)),
+              backgroundColor: AppColors.belumLunas,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
             child: const Text('Keluar',
                 style: TextStyle(color: Colors.white)),
           ),

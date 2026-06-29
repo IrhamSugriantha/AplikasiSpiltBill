@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 import '../models/user_model.dart';
 import '../models/session_model.dart';
 import '../models/item_model.dart';
@@ -12,96 +15,130 @@ class AppController extends ChangeNotifier {
   UserModel? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
 
-  // Dummy registered users list (simulates a local DB)
-  final List<UserModel> _registeredUsers = [
-    UserModel(
-      id: 'user-budi',
-      name: 'Budi',
-      email: 'budi@example.com',
-      password: 'password123',
-    ),
-  ];
+  // ── Persistent Login ─────────────────────────────────────────
+  static const _keyUserId = 'saved_user_id';
 
-  /// Returns null on success, error message on failure
-  String? login(String email, String password) {
-    final user = _registeredUsers.where(
-      (u) => u.email.trim().toLowerCase() == email.trim().toLowerCase() &&
-             u.password == password,
-    );
-    if (user.isEmpty) return 'Email atau password salah.';
-    _currentUser = user.first;
-    notifyListeners();
-    return null;
+  /// Coba auto-login dari data yang tersimpan di penyimpanan lokal
+  Future<bool> tryAutoLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedId = prefs.getString(_keyUserId);
+    if (savedId == null) return false;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(savedId)
+          .get();
+      if (!doc.exists) {
+        await prefs.remove(_keyUserId);
+        return false;
+      }
+      _currentUser = UserModel.fromJson(doc.data()!);
+      _startListening();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> _saveSession() async {
+    if (_currentUser == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyUserId, _currentUser!.id);
+  }
+
+  Future<void> _clearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyUserId);
   }
 
   /// Returns null on success, error message on failure
-  String? register(String name, String email, String password) {
-    final exists = _registeredUsers.any(
-      (u) => u.email.trim().toLowerCase() == email.trim().toLowerCase(),
-    );
-    if (exists) return 'Email sudah terdaftar.';
-    final newUser = UserModel(
-      id: _uuid.v4(),
-      name: name.trim(),
-      email: email.trim(),
-      password: password,
-    );
-    _registeredUsers.add(newUser);
-    _currentUser = newUser;
-    // Pre-seed dummy sessions for new user (empty by default)
-    notifyListeners();
-    return null;
+  Future<String?> login(String email, String password) async {
+    try {
+      final qs = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email.trim().toLowerCase())
+          .where('password', isEqualTo: password)
+          .get();
+      if (qs.docs.isEmpty) return 'Email atau password salah.';
+      _currentUser = UserModel.fromJson(qs.docs.first.data());
+      await _saveSession();
+      _startListening();
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
   }
 
-  void logout() {
+  /// Returns null on success, error message on failure
+  Future<String?> register(String name, String email, String password) async {
+    try {
+      final qs = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email.trim().toLowerCase())
+          .get();
+      if (qs.docs.isNotEmpty) return 'Email sudah terdaftar.';
+
+      final newUser = UserModel(
+        id: _uuid.v4(),
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password: password,
+      );
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(newUser.id)
+          .set(newUser.toJson());
+
+      _currentUser = newUser;
+      await _saveSession();
+      _startListening();
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<void> logout() async {
+    await _clearSession();
     _currentUser = null;
+    _sessionsSub?.cancel();
+    _sessions.clear();
     notifyListeners();
   }
 
   // ── Session State ───────────────────────────────────────────
-  final List<SessionModel> _sessions = [
-    SessionModel(
-      id: 'sess-1',
-      sessionName: 'Nugas Kafe A',
-      date: '12 Okt 2023',
-      members: ['Budi', 'Irham', 'Citra'],
-      mode: BillMode.detailPesanan,
-      isCompleted: false,
-      items: [
-        OrderItem(id: 'i1', name: 'Ayam Bakar Madu Spesial', price: 80000, assignedTo: 'Budi'),
-        OrderItem(id: 'i2', name: 'Nasi Padang', price: 10000, assignedTo: 'Irham'),
-        OrderItem(id: 'i3', name: 'Jus Jeruk', price: 5000, assignedTo: 'Irham'),
-        OrderItem(id: 'i4', name: 'Kwetiau Siram Sapi', price: 55000, assignedTo: 'Citra'),
-      ],
-    ),
-    SessionModel(
-      id: 'sess-2',
-      sessionName: 'Nonton Bioskop',
-      date: '10 Okt 2023',
-      members: ['Budi', 'Ani', 'Citra'],
-      mode: BillMode.bagiRata,
-      totalBill: 105000,
-      isCompleted: false,
-    ),
-    SessionModel(
-      id: 'sess-3',
-      sessionName: 'Nasi Padang Stikes',
-      date: '05 Okt 2023',
-      members: ['Budi', 'Reza', 'Sari'],
-      mode: BillMode.bagiRata,
-      totalBill: 150000,
-      isCompleted: true,
-    ),
-    SessionModel(
-      id: 'sess-4',
-      sessionName: 'Ngopi Senja',
-      date: '28 Sep 2023',
-      members: ['Budi', 'Dina'],
-      mode: BillMode.bagiRata,
-      totalBill: 85000,
-      isCompleted: true,
-    ),
-  ];
+  final List<SessionModel> _sessions = [];
+  StreamSubscription? _sessionsSub;
+
+  void _startListening() {
+    _sessionsSub?.cancel();
+    if (_currentUser == null) return;
+    
+    // For simplicity, we load all sessions that involve the user.
+    // In production, we'd use array-contains on members field.
+    _sessionsSub = FirebaseFirestore.instance
+        .collection('sessions')
+        .where(
+          'ownerId',
+          isEqualTo: _currentUser!.id,
+        )
+        .snapshots()
+        .listen((snapshot) {
+      _sessions.clear();
+      for (final doc in snapshot.docs) {
+        try {
+          _sessions.add(SessionModel.fromJson(doc.data()));
+        } catch (e) {
+          // Ignore bad data
+        }
+      }
+      notifyListeners();
+    });
+  }
 
   List<SessionModel> get sessions => List.unmodifiable(_sessions);
 
@@ -116,12 +153,12 @@ class AppController extends ChangeNotifier {
   double get totalPiutang {
     double total = 0;
     for (final s in activeSessions) {
-      // Piutang = total bill minus host's own share
-      final perPerson = s.mode == BillMode.bagiRata
-          ? s.perPersonAmount
-          : (s.members.isEmpty ? 0 : s.effectiveTotal / s.members.length);
-      // Count non-host, non-paid members
-      total += s.effectiveTotal - perPerson;
+      final bills = s.buildMemberBills(hostName);
+      for (final mb in bills) {
+        if (!mb.isHost && !mb.isPaid) {
+          total += s.mode == BillMode.bagiRata ? s.perPersonAmount : mb.total;
+        }
+      }
     }
     return total;
   }
@@ -138,26 +175,38 @@ class AppController extends ChangeNotifier {
   }) {
     return SessionModel(
       id: _uuid.v4(),
+      ownerId: _currentUser!.id,
       sessionName: name,
       date: date,
       members: members,
     );
   }
 
-  void finalizeSession(SessionModel session) {
-    final idx = _sessions.indexWhere((s) => s.id == session.id);
-    if (idx != -1) {
-      _sessions[idx] = session;
-    } else {
-      _sessions.insert(0, session);
-    }
-    notifyListeners();
+  Future<void> finalizeSession(SessionModel session) async {
+    final bills = session.buildMemberBills(hostName);
+    final allPaid = bills.every((mb) => mb.isPaid);
+    session.isCompleted = allPaid;
+
+    await FirebaseFirestore.instance
+        .collection('sessions')
+        .doc(session.id)
+        .set(session.toJson());
   }
 
-  void toggleMemberPaid(String sessionId, String memberName) {
+  Future<void> deleteSession(String id) async {
+    await FirebaseFirestore.instance.collection('sessions').doc(id).delete();
+  }
+
+  Future<void> toggleMemberPaid(String sessionId, String memberName) async {
     final session = _sessions.firstWhere((s) => s.id == sessionId);
-    // We track paid state differently — store paid member names
+    if (session.paidMembers.contains(memberName)) {
+      session.paidMembers = Set.from(session.paidMembers)..remove(memberName);
+    } else {
+      session.paidMembers = Set.from(session.paidMembers)..add(memberName);
+    }
+
     notifyListeners();
+    await finalizeSession(session);
   }
 
   String get hostName => _currentUser?.name ?? 'Host';

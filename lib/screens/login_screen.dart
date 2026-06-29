@@ -30,16 +30,21 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _isLoading = true; _errorMsg = null; });
-    await Future.delayed(const Duration(milliseconds: 400));
+    
+    final email = _emailCtrl.text.trim();
+    final pass = _passCtrl.text;
+
     final controller = context.read<AppController>();
-    final error = controller.login(_emailCtrl.text, _passCtrl.text);
+    final error = await controller.login(email, pass);
+    
     if (!mounted) return;
     setState(() { _isLoading = false; });
     if (error != null) {
       setState(() { _errorMsg = error; });
     } else {
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const MainScreen()),
+        (route) => false,
       );
     }
   }

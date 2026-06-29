@@ -20,6 +20,7 @@ class MemberBill {
 
 class SessionModel {
   final String id;
+  final String ownerId;
   String sessionName;
   String date;
   List<String> members; // member names
@@ -27,9 +28,11 @@ class SessionModel {
   double totalBill; // used for bagiRata mode
   List<OrderItem> items; // used for detailPesanan mode
   bool isCompleted; // all members paid
+  Set<String> paidMembers; // track who has paid
 
   SessionModel({
     required this.id,
+    required this.ownerId,
     required this.sessionName,
     required this.date,
     required this.members,
@@ -37,6 +40,7 @@ class SessionModel {
     this.totalBill = 0,
     this.items = const [],
     this.isCompleted = false,
+    this.paidMembers = const {},
   });
 
   /// Returns per-member bill amount in bagiRata mode
@@ -56,7 +60,7 @@ class SessionModel {
         final mb = MemberBill(
           name: m,
           isHost: m == hostName,
-          isPaid: m == hostName,
+          isPaid: m == hostName || paidMembers.contains(m),
         );
         return mb;
       }).toList();
@@ -70,13 +74,49 @@ class SessionModel {
         grouped.putIfAbsent(item.assignedTo, () => []).add(item);
       }
       return members.map((m) {
+        final memberItems = grouped[m] ?? [];
+        final hasNoBill = memberItems.isEmpty;
         return MemberBill(
           name: m,
           isHost: m == hostName,
-          items: grouped[m] ?? [],
-          isPaid: m == hostName,
+          items: memberItems,
+          isPaid: m == hostName || hasNoBill || paidMembers.contains(m),
         );
       }).toList();
     }
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'ownerId': ownerId,
+        'sessionName': sessionName,
+        'date': date,
+        'members': members,
+        'mode': mode.name,
+        'totalBill': totalBill,
+        'items': items.map((i) => i.toJson()).toList(),
+        'isCompleted': isCompleted,
+        'paidMembers': paidMembers.toList(),
+      };
+
+  factory SessionModel.fromJson(Map<String, dynamic> json) {
+    return SessionModel(
+      id: json['id'] ?? '',
+      ownerId: json['ownerId'] ?? '',
+      sessionName: json['sessionName'] ?? '',
+      date: json['date'] ?? '',
+      members: List<String>.from(json['members'] ?? []),
+      mode: BillMode.values.firstWhere(
+        (e) => e.name == json['mode'],
+        orElse: () => BillMode.bagiRata,
+      ),
+      totalBill: (json['totalBill'] ?? 0).toDouble(),
+      items: (json['items'] as List<dynamic>?)
+              ?.map((i) => OrderItem.fromJson(i as Map<String, dynamic>))
+              .toList() ??
+          [],
+      isCompleted: json['isCompleted'] ?? false,
+      paidMembers: Set<String>.from(json['paidMembers'] ?? []),
+    );
   }
 }

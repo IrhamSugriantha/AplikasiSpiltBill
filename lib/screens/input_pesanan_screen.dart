@@ -10,7 +10,8 @@ import 'ringkasan_tagihan_screen.dart';
 
 class InputPesananScreen extends StatefulWidget {
   final SessionModel session;
-  const InputPesananScreen({super.key, required this.session});
+  final bool isEdit;
+  const InputPesananScreen({super.key, required this.session, this.isEdit = false});
 
   @override
   State<InputPesananScreen> createState() => _InputPesananScreenState();
@@ -29,7 +30,23 @@ class _InputPesananScreenState extends State<InputPesananScreen> {
   @override
   void initState() {
     super.initState();
-    _addItemEntry();
+    _mode = widget.session.mode;
+    if (_mode == BillMode.bagiRata && widget.session.totalBill > 0) {
+      _totalCtrl.text = widget.session.totalBill.toInt().toString();
+    }
+
+    if (widget.session.items.isNotEmpty) {
+      for (final item in widget.session.items) {
+        _itemEntries.add(_ItemEntry(
+          id: item.id,
+          nameCtrl: TextEditingController(text: item.name),
+          priceCtrl: TextEditingController(text: item.price.toInt().toString()),
+          assignedTo: item.assignedTo,
+        ));
+      }
+    } else {
+      _addItemEntry();
+    }
   }
 
   @override
@@ -61,7 +78,7 @@ class _InputPesananScreenState extends State<InputPesananScreen> {
     });
   }
 
-  void _hitungPembagian() {
+  Future<void> _hitungPembagian() async {
     final ctrl = context.read<AppController>();
 
     if (_mode == BillMode.bagiRata) {
@@ -103,8 +120,10 @@ class _InputPesananScreenState extends State<InputPesananScreen> {
       widget.session.items = items;
     }
 
-    ctrl.finalizeSession(widget.session);
+    // Trik "Delete & Re-Create": Here we just finalize (set) to Firestore
+    await ctrl.finalizeSession(widget.session);
 
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -509,9 +528,20 @@ class _ItemCard extends StatelessWidget {
                             color: AppColors.textSecondary)),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
+                      isExpanded: true,
                       value: members.contains(entry.assignedTo)
                           ? entry.assignedTo
                           : members.first,
+                      selectedItemBuilder: (BuildContext context) {
+                        return members.map<Widget>((String m) {
+                          return Text(
+                            m,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13),
+                          );
+                        }).toList();
+                      },
                       items: members
                           .map((m) => DropdownMenuItem(
                                 value: m,
