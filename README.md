@@ -1,25 +1,57 @@
-# 📱 SplitBill - Aplikasi Pengelola Tagihan Patungan
+# 🧾 SplitBill - Aplikasi Pembagi Tagihan
 
-SplitBill adalah aplikasi mobile berbasis Flutter yang dirancang untuk mempermudah pengelolaan, perhitungan, dan pelacakan tagihan patungan (split bill) secara praktis, adil, dan transparan. Menggunakan pendekatan *Host-Centric*, aplikasi ini memungkinkan satu orang pengguna (Host) mengelola seluruh proses penagihan tanpa mewajibkan anggota lain memiliki akun.
+SplitBill adalah aplikasi berbasis *mobile* yang dikembangkan menggunakan **Flutter** dan **Firebase** untuk mempermudah pengguna dalam mencatat, menghitung, dan membagi tagihan makan bersama teman-teman secara adil.
 
----
+Proyek ini dibuat sebagai pemenuhan **Tugas Akhir Mata Kuliah Pemrograman Mobile (UAS)** di Institut Teknologi Garut.
 
-## 🚀 Fitur Utama (UAS Target)
-1. **Manajemen Otentikasi Pembuat Sesi (Host Auth)**: Keamanan akun untuk Host menggunakan Firebase/Supabase Authentication.
-2. **Fleksibilitas Pembuat Sesi (Dual-Mode Bill Creation)**: Pilihan kalkulasi otomatis melalui mode *Bagi Rata* atau mode *Detail Pesanan*.
-3. **Dasbor Pemantau Piutang (Real-Time Dashboard)**: Ringkasan akumulasi piutang aktif dan riwayat sesi nongkrong.
-4. **Ringkasan Transparansi Tagihan (Smart Tracking)**: UI dinamis menggunakan komponen ekspansi (*dropdown*) untuk merinci pesanan per anggota serta *checkbox* kontrol status kelunasan.
+## ✨ Fitur Utama
+1. **Autentikasi Pintar (Auto-Login):** Menggunakan PIN sederhana yang akan diingat secara otomatis menggunakan `shared_preferences`.
+2. **Manajemen Sesi Tagihan:** Memungkinkan pembuatan sesi baru untuk setiap acara makan/nongkrong.
+3. **Dua Mode Pembagian Tagihan:**
+   - **Bagi Rata:** Membagi total tagihan sama besar kepada seluruh anggota sesi.
+   - **Detail Pesanan:** Menghitung tagihan secara spesifik berdasarkan makanan/minuman yang dipesan masing-masing anggota.
+4. **Pelacakan Status Lunas:** Kemudahan melacak siapa saja teman yang sudah membayar (Lunas) dan yang belum.
+5. **Real-time Database:** Data tersimpan dengan aman menggunakan *Firebase Cloud Firestore*.
 
----
+## 🛠️ Teknologi yang Digunakan (Tech Stack)
+* **Frontend:** Flutter (Dart)
+* **Backend:** Firebase Cloud Firestore (NoSQL)
+* **State Management:** Provider
+* **Local Storage:** Shared Preferences
+* **Ikon Tambahan:** Material Icons & flutter_launcher_icons
 
-## 📂 Struktur Folder Proyek (Arsitektur Model-Controller-Screen)
-Proyek ini menerapkan struktur folder yang terorganisir untuk mempermudah kolaborasi tim dan skalabilitas kode:
+## 📱 Struktur Halaman (Screens)
+* `LoginScreen`: Halaman masuk dan pembuatan sesi pengguna.
+* `ActivityScreen` (Dashboard): Daftar seluruh riwayat sesi makan bersama.
+* `InputSesiScreen`: Form untuk membuat sesi baru (Tanggal, Nama Sesi, & Daftar Teman).
+* `InputPesananScreen`: Memilih mode perhitungan (Bagi Rata / Detail Pesanan) serta memasukkan harga tiap item makanan.
+* `RingkasanTagihanScreen`: Rangkuman total yang harus dibayar tiap orang beserta status lunas.
 
-```text
-lib/
-├── controllers/    # Logika bisnis, state management, dan pengolahan data
-├── models/         # Blueprint/Struktur data object (User, Session, Item, Member)
-├── screens/        # Komponen halaman penuh (Login, Dashboard, Ringkasan Tagihan)
-├── utils/          # Konstanta global (Warna, tema teks/typography, format rupiah)
-├── widgets/        # Komponen UI kecil yang dapat digunakan berulang (Reusable Component)
-└── main.dart       # Titik masuk utama (Entry point) aplikasi
+## 🚀 Cara Menjalankan Proyek Secara Lokal
+
+**Prasyarat:**
+- Pastikan Anda telah menginstal [Flutter SDK](https://docs.flutter.dev/get-started/install).
+- Pastikan Anda memiliki emulator Android/iOS atau *smartphone* asli yang tersambung dengan mode *USB Debugging*.
+
+**Langkah Instalasi:**
+1. _Clone_ repositori ini:
+   ```bash
+   git clone [MASUKKAN-LINK-GITHUB-ANDA-DI-SINI]
+   ```
+2. Masuk ke direktori proyek:
+   ```bash
+   cd aplikasispiltbill_uas
+   ```
+3. Unduh semua *packages* yang dibutuhkan:
+   ```bash
+   flutter pub get
+   ```
+4. Jalankan aplikasi:
+   ```bash
+   flutter run
+   ```
+
+## 👥 Pengembang (Kelompok)
+* **Irham Sugriantha** - 2306048
+* **Restu Bagja Maulud** - 2306043
+* **Tsani Hisni Amala** - 2306050
